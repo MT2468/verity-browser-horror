@@ -8,11 +8,9 @@
   const MIN_GAP_MS = 10500;
   const TICK_MS = 1200;
 
-  const attach = window.setInterval(() => {
-    const scene = window.__VERITY_GAME__?.scene?.getScene('Game');
-    if (!scene?.started || !scene.player?.active || !scene.verity?.active) return;
-    window.clearInterval(attach);
-    if (scene.__psychDirectorAttached) return;
+  const attachToScene = scene => {
+    if (!scene?.started || !scene.player?.active || !scene.verity?.active) return false;
+    if (scene.__psychDirectorAttached) return false;
     scene.__psychDirectorAttached = true;
 
     let destroyed = false;
@@ -175,22 +173,33 @@
 
     directorTimer = window.setInterval(tick, TICK_MS);
 
-    window.__VERITY_DIRECTOR__ = {
+    const api = {
       getState: directorState,
       forceBeat,
       available: () => eligibleBeats().slice(),
     };
+    window.__VERITY_DIRECTOR__ = api;
 
     const cleanup = () => {
       if (destroyed) return;
       destroyed = true;
       window.clearInterval(directorTimer);
       cleanupTransient();
-      if (window.__VERITY_DIRECTOR__?.forceBeat === forceBeat) delete window.__VERITY_DIRECTOR__;
+      scene.__psychDirectorAttached = false;
+      if (window.__VERITY_DIRECTOR__ === api) delete window.__VERITY_DIRECTOR__;
     };
 
     scene.events.once('shutdown', cleanup);
     scene.events.once('destroy', cleanup);
     console.info('[VERITY] psychological director active', directorState());
-  }, 100);
+    return true;
+  };
+
+  // Keep the small attach watcher alive for the lifetime of the page. Phaser reuses
+  // the Game object but can restart the Scene after "Jogar novamente"; a one-shot
+  // watcher would silently remove the director from subsequent runs.
+  window.setInterval(() => {
+    const scene = window.__VERITY_GAME__?.scene?.getScene('Game');
+    attachToScene(scene);
+  }, 150);
 })();
