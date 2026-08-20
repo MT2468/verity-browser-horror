@@ -10,6 +10,72 @@ button:focus-visible {
   text-align: center;
 }
 
+html[data-verity-contrast="high"] body,
+html[data-verity-contrast="high"] .panel {
+  color: #fff;
+}
+html[data-verity-contrast="high"] .panel,
+html[data-verity-contrast="high"] .objective-card,
+html[data-verity-contrast="high"] .meter,
+html[data-verity-contrast="high"] #recapCard {
+  border-color: rgba(255,255,255,.58) !important;
+  background-color: rgba(0,0,0,.94) !important;
+}
+html[data-verity-contrast="high"] .eyebrow,
+html[data-verity-contrast="high"] .speaker,
+html[data-verity-contrast="high"] .day-chip span,
+html[data-verity-contrast="high"] .objective-card span,
+html[data-verity-contrast="high"] .meter span {
+  color: #fff !important;
+}
+html[data-verity-contrast="high"] button {
+  border-color: #fff !important;
+}
+html[data-verity-contrast="high"] .primary {
+  color: #070707 !important;
+  background: #fff42e !important;
+}
+html[data-verity-contrast="high"] #objectiveBar,
+html[data-verity-contrast="high"] #staminaBar {
+  filter: brightness(1.25) saturate(1.2);
+}
+
+html[data-verity-text="large"] body,
+html[data-verity-text="large"] button {
+  font-size: 112%;
+}
+html[data-verity-text="large"] .dialogue,
+html[data-verity-text="large"] .warning,
+html[data-verity-text="large"] .objective-card strong,
+html[data-verity-text="large"] #recapCard {
+  font-size: 12px !important;
+  line-height: 1.65 !important;
+}
+html[data-verity-text="large"] .controls,
+html[data-verity-text="large"] .fan-note,
+html[data-verity-text="large"] .eyebrow {
+  font-size: 11px !important;
+}
+
+html[data-verity-fx="soft"] .scanlines {
+  opacity: .025 !important;
+}
+html[data-verity-fx="soft"] .glitch-flash,
+html[data-verity-fx="soft"] .glitch-flash.hit {
+  animation: none !important;
+  opacity: .035 !important;
+}
+html[data-verity-fx="soft"] .vignette {
+  opacity: .32 !important;
+}
+html[data-verity-fx="soft"] *,
+html[data-verity-fx="soft"] *::before,
+html[data-verity-fx="soft"] *::after {
+  animation-duration: .001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: .001ms !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;
