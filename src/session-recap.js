@@ -5,7 +5,8 @@
 
   const KEY = 'verity-browser-horror-recap-v1';
   const qa = new URLSearchParams(location.search).has('qa');
-  const state = { startedAt: Date.now(), day: 1, deaths: 0, pulses: 0, interactions: 0, maxSignal: 0, lastCause: '', ending: '' };
+  const freshState = () => ({ startedAt: Date.now(), day: 1, deaths: 0, pulses: 0, interactions: 0, maxSignal: 0, lastCause: '', ending: '' });
+  let state = freshState();
   let scene = null;
 
   const load = () => {
@@ -29,7 +30,12 @@
     card.hidden = false;
   };
 
-  const snapshot = ending => ({ ...state, ending: ending || state.ending, duration: Date.now() - state.startedAt, recordedAt: Date.now() });
+  const snapshot = ending => ({ ...state, ending: ending || state.ending, duration: Math.max(0, Date.now() - state.startedAt), recordedAt: Date.now() });
+  const resetSession = requestedDay => {
+    state = freshState();
+    state.day = Math.max(1, Math.min(6, Number(requestedDay) || 1));
+    card.hidden = true;
+  };
 
   const attach = s => {
     if (!s?.started || s === scene) return;
@@ -41,14 +47,48 @@
     const wrap = (name, after) => {
       const original = s[name];
       if (typeof original !== 'function') return;
-      s[name] = function(...args) { const result = original.apply(this, args); after.call(this, args); return result; };
+      s[name] = function(...args) {
+        const before = {
+          transitioning: Boolean(this.transitioning),
+          progress: Number(this.progress || 0),
+          signal: Number(this.signal || 0),
+        };
+        const result = original.apply(this, args);
+        after.call(this, args, before);
+        return result;
+      };
     };
-    wrap('completeTarget', () => { state.interactions++; state.day = Math.max(state.day, Number(s.day || 1)); });
-    wrap('playerCaught', () => { state.deaths++; state.lastCause = 'contato com uma sombra'; save(snapshot()); });
-    wrap('gameOver', args => { state.deaths++; state.lastCause = String(args?.[0] || 'sinal perdido'); save(snapshot()); });
-    wrap('showEnding', args => { state.ending = String(args?.[0] || 'ending'); const data = snapshot(state.ending); save(data); setTimeout(() => render(data), 0); });
 
-    s.events.once('shutdown', () => { state.day = Math.max(state.day, Number(s.day || 1)); if (scene === s) scene = null; });
+    wrap('completeTarget', (_args, before) => {
+      if (Number(s.progress || 0) > before.progress) {
+        state.interactions++;
+        state.day = Math.max(state.day, Number(s.day || 1));
+      }
+    });
+
+    wrap('failDay', (_args, before) => {
+      if (before.transitioning || !s.transitioning) return;
+      state.deaths++;
+      state.lastCause = before.signal >= 100 ? 'sinal saturado' : 'conexão perdida';
+      save(snapshot());
+    });
+
+    wrap('finishGame', (_args, before) => {
+      if (before.transitioning || !s.transitioning) return;
+      const dx = Number(s.player?.x || 0) - Number(s.verity?.x || 0);
+      const dy = Number(s.player?.y || 0) - Number(s.verity?.y || 0);
+      const hidden = before.signal < 55 && Math.hypot(dx, dy) < 180;
+      state.ending = hidden ? 'ficou com Verity' : 'escapou da conexão';
+      state.lastCause = hidden ? 'a porta ficou para trás' : 'saída alcançada';
+      const data = snapshot(state.ending);
+      save(data);
+      setTimeout(() => render(data), 1050);
+    });
+
+    s.events.once('shutdown', () => {
+      state.day = Math.max(state.day, Number(s.day || 1));
+      if (scene === s) scene = null;
+    });
   };
 
   const poll = setInterval(() => {
@@ -61,10 +101,24 @@
     const pulse = window.__VERITY_PULSE__?.getState?.();
     if (pulse && Number(pulse.count) > state.pulses) state.pulses = Number(pulse.count);
   }, 250);
+
+  document.querySelector('#startBtn')?.addEventListener('click', () => resetSession(1), { capture: true });
+  document.querySelector('#continueBtn')?.addEventListener('click', () => {
+    let day = 1;
+    try { day = Number(JSON.parse(localStorage.getItem('verity-browser-horror-save-v2') || 'null')?.day || 1); } catch {}
+    resetSession(day);
+  }, { capture: true });
+  document.querySelector('#playAgainBtn')?.addEventListener('click', () => resetSession(1), { capture: true });
+
   window.addEventListener('pagehide', () => { clearInterval(poll); save(snapshot()); }, { once: true });
 
   const previous = load();
-  if (previous && document.querySelector('#ending:not(.hidden)')) render(previous);
-  window.__VERITY_RECAP__ = { getState: () => snapshot(), getLast: load, renderLast: () => render(load()) };
+  if (previous && !document.querySelector('#ending')?.classList.contains('hidden')) render(previous);
+  window.__VERITY_RECAP__ = {
+    getState: () => snapshot(),
+    getLast: load,
+    renderLast: () => render(load()),
+    resetSession: day => { resetSession(day); return snapshot(); },
+  };
   console.info('[VERITY] session recap active', window.__VERITY_BUILD__);
 })();
