@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#080a08" />
+  <title>VERITY // I KNOW EVERYTHING</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main id="app">
+    <div id="game"></div>
+
+    <section id="boot" class="panel boot-panel">
+      <div class="boot-mark" aria-hidden="true">:)</div>
+      <p class="eyebrow">SUBJECT #001</p>
+      <h1>VERITY</h1>
+      <p class="boot-copy">Uma pequena assistente amarela quer ajudar você a voltar para casa.</p>
+      <p class="boot-copy dim">Ela sabe mais do que deveria.</p>
+      <button id="startBtn" class="primary">INICIAR SESSÃO</button>
+      <button id="continueBtn" class="secondary hidden">CONTINUAR</button>
+      <p class="controls">WASD / setas · SHIFT correr · E interagir · F lanterna · ESC pausa</p>
+      <p class="fan-note">Fan game não oficial. Arte e código originais, inspirado no conceito de Verity.</p>
+    </section>
+
+    <section id="hud" class="hud hidden" aria-live="polite">
+      <div class="top-left">
+        <div class="day-chip"><span>DIA</span><strong id="dayLabel">01</strong></div>
+        <div class="objective-card">
+          <span>OBJETIVO</span>
+          <strong id="objectiveLabel">Aguardando...</strong>
+          <div class="objective-progress"><i id="objectiveBar"></i></div>
+        </div>
+      </div>
+
+      <div class="top-right">
+        <div class="meter">
+          <span>FÔLEGO</span>
+          <div><i id="staminaBar"></i></div>
+        </div>
+        <div class="meter danger-meter">
+          <span>SINAL</span>
+          <div><i id="signalBar"></i></div>
+        </div>
+      </div>
+
+      <div id="prompt" class="prompt hidden">E · INTERAGIR</div>
+      <div id="dialogue" class="dialogue hidden">
+        <div class="speaker" id="speaker">VERITY</div>
+        <p id="dialogueText"></p>
+      </div>
+
+      <div id="flashlightIndicator" class="flashlight">LANTERNA <b>ON</b></div>
+      <div id="warning" class="warning hidden"></div>
+    </section>
+
+    <section id="pause" class="panel pause-panel hidden">
+      <p class="eyebrow">SESSÃO SUSPENSA</p>
+      <h2>PAUSADO</h2>
+      <button id="resumeBtn" class="primary">VOLTAR</button>
+      <button id="restartBtn" class="secondary">RECOMEÇAR DIA</button>
+      <button id="resetBtn" class="danger">APAGAR PROGRESSO</button>
+    </section>
+
+    <section id="ending" class="panel ending-panel hidden">
+      <p class="eyebrow">CONEXÃO ENCERRADA</p>
+      <h2 id="endingTitle">VOCÊ SAIU.</h2>
+      <p id="endingText"></p>
+      <button id="playAgainBtn" class="primary">JOGAR NOVAMENTE</button>
+    </section>
+
+    <div class="scanlines" aria-hidden="true"></div>
+    <div id="vignette" class="vignette" aria-hidden="true"></div>
+    <div id="glitchFlash" class="glitch-flash" aria-hidden="true"></div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
+  <script type="module" src="src/game.js"></script>
+</body>
+</html>
