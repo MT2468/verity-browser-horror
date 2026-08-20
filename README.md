@@ -24,6 +24,7 @@ A campanha é dividida em seis dias. Verity começa como uma companheira prestat
 | Interagir | E |
 | Lanterna | F |
 | Pulso de sinal | Q |
+| Arquivo de memória | J |
 | Pausa | Esc |
 
 Também há movimento por clique/toque e controles compactos em telas touch.
@@ -31,6 +32,10 @@ Também há movimento por clique/toque e controles compactos em telas touch.
 ### Pulso de sinal
 
 O pulso é uma ferramenta de risco e recompensa: ele revela por um curto período objetivos e ameaças próximas, além de informar a distância do eco mais próximo. Em troca, aumenta o nível de sinal, possui recarga de 8 segundos e deixa sombras atingidas pelo pulso ligeiramente mais rápidas. O sistema bloqueia o uso quando o sinal já está saturado, então não substitui exploração cuidadosa.
+
+### Arquivo de memória
+
+A build 0.6.0 adiciona uma camada de metaprogressão narrativa. O primeiro objetivo concluído de cada dia recupera um registro de memória de Verity; o Dia 4 recupera seu registro ao completar a noite. Esses seis fragmentos ficam preservados em `localStorage` mesmo entre sessões e podem ser lidos a qualquer momento com `J` ou pelo botão `ARQUIVO`. O painel é um diálogo acessível com foco preso enquanto aberto, suporte a teclado, contagem de registros, mensagens via `aria-live` e conteúdo bloqueado explicitamente indicado sem expor o texto antes da hora. Abrir o arquivo interrompe a movimentação do jogador sem destruir o estado da campanha.
 
 ### Diretor psicológico
 
@@ -47,6 +52,7 @@ A build 0.5.0 inclui um governador adaptativo de efeitos. Ele mede o frame time 
 - IA de acompanhamento/perseguição para Verity;
 - inimigos-sombra com agressividade variável;
 - stamina, sinal/perigo, lanterna, pulso de sinal e save em `localStorage`;
+- arquivo persistente com seis registros narrativos desbloqueáveis;
 - diretor psicológico com eventos contextuais, ecos falsos, aparições e brownouts;
 - governador adaptativo de efeitos com telemetria local de FPS e suporte a movimento reduzido;
 - áudio sintetizado via Web Audio API, sem arquivos de áudio externos;
@@ -70,6 +76,7 @@ src/
   navigation-runtime.js     # bússola de objetivo resiliente a throttling
   signal-pulse.js           # habilidade de pulso com risco/recompensa
   psychological-director.js # diretor de horror e eventos contextuais
+  memory-archive.js         # metaprogressão narrativa persistente e UI acessível
   performance-governor.js   # medição de FPS, histerese e orçamento de FX
   qa.js                     # harness de teste opcional
   qa-stability.js           # verificação de estabilidade após o teste
@@ -79,7 +86,7 @@ O projeto usa Phaser 3.90 via CDN e JavaScript ES modules, sem etapa de build.
 
 ## QA
 
-Para desenvolvimento, `?qa=1&autotest=1` habilita um painel que inicializa e valida os seis dias, objetivos, atores, perseguição final, limites de estado e o ciclo do pulso de sinal. Esse modo não aparece para jogadores normais. O diretor psicológico detecta `qa=1`, suspende eventos aleatórios e expõe `window.__VERITY_DIRECTOR__` com estado e acionamento manual de beats para inspeção determinística. O governador expõe `window.__VERITY_PERF__` para inspeção manual do nível, FPS estimado e orçamento de efeitos.
+Para desenvolvimento, `?qa=1&autotest=1` habilita um painel que inicializa e valida os seis dias, objetivos, atores, perseguição final, limites de estado e o ciclo do pulso de sinal. Esse modo não aparece para jogadores normais. O diretor psicológico detecta `qa=1`, suspende eventos aleatórios e expõe `window.__VERITY_DIRECTOR__` com estado e acionamento manual de beats para inspeção determinística. O governador expõe `window.__VERITY_PERF__` para inspeção manual do nível, FPS estimado e orçamento de efeitos. O arquivo de memória expõe `window.__VERITY_ARCHIVE__` em runtime, incluindo estado, abertura/fechamento e reset apenas quando `qa=1`, para permitir inspeção determinística sem contaminar o progresso persistente do jogador.
 
 ## Aviso
 
