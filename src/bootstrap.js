@@ -2,7 +2,7 @@
   const Phaser = window.Phaser;
   if (!Phaser?.Game || window.__VERITY_BOOTSTRAPPED__) return;
   window.__VERITY_BOOTSTRAPPED__ = true;
-  window.__VERITY_BUILD__ = '0.5.0';
+  window.__VERITY_BUILD__ = '0.6.0';
   window.__VERITY_REQUESTED_DAY__ = 1;
 
   const readSavedDay = () => {
