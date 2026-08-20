@@ -76,6 +76,15 @@
     throw new Error('Game scene did not become ready');
   };
 
+  const waitForPulse = async (timeout = 3000) => {
+    const start = performance.now();
+    while (performance.now() - start < timeout) {
+      if (window.__VERITY_PULSE__?.emit && window.__VERITY_PULSE__?.getState) return window.__VERITY_PULSE__;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    throw new Error('Signal pulse runtime did not attach');
+  };
+
   const completeOne = scene => {
     const target = scene.objectives?.getChildren()?.find(object => object.active && !object.getData('done'));
     if (!target) return false;
@@ -126,6 +135,21 @@
     }
   };
 
+  const testPulse = async scene => {
+    const pulse = await waitForPulse();
+    scene.pausedByUI = false;
+    scene.transitioning = false;
+    scene.signal = 0;
+    const before = scene.signal;
+    const fired = pulse.emit();
+    assert(fired === true, 'signal pulse fires when ready');
+    assert(scene.signal === before + 14, 'signal pulse applies risk cost');
+    const pulseState = pulse.getState();
+    assert(pulseState.revealing === true, 'signal pulse enters reveal window');
+    assert(pulseState.cooldownMs > 0, 'signal pulse starts cooldown');
+    assert(pulse.emit() === false, 'signal pulse cannot be spammed during cooldown');
+  };
+
   const runFull = async () => {
     if (state.running) return;
     state.running = true;
@@ -151,6 +175,7 @@
         await testDay(scene, day);
       }
 
+      await testPulse(scene);
       assert(scene.hazards.countActive() >= 8, 'final chase population present');
       assert(scene.signal >= 0 && scene.signal <= 100, 'signal remains clamped');
       assert(scene.stamina >= 0 && scene.stamina <= 100, 'stamina remains clamped');
