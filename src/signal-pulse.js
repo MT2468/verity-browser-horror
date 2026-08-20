@@ -39,14 +39,7 @@
     let revealUntil = 0;
     let hintTimer = 0;
     let pulseRing = null;
-    let pulseKey = null;
     let destroyed = false;
-
-    try {
-      pulseKey = scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
-    } catch (_) {
-      pulseKey = null;
-    }
 
     const signalCap = () => Phaser.Math.Clamp(Number(scene.signal) || 0, 0, 100);
     const cooldownLeft = now => Math.max(0, COOLDOWN_MS - (now - lastPulse));
@@ -73,18 +66,20 @@
       for (const hazard of scene.hazards?.getChildren?.() || []) {
         if (hazard?.active && typeof hazard.clearTint === 'function') hazard.clearTint();
       }
+      if (scene.verity?.active && typeof scene.verity.clearTint === 'function') scene.verity.clearTint();
+      if (scene.exitDoor?.active && typeof scene.exitDoor.clearTint === 'function') scene.exitDoor.clearTint();
     };
 
     const emitPulse = () => {
       const now = performance.now();
-      if (destroyed || scene.pausedByUI || scene.transitioning || scene.scene?.isPaused?.()) return;
+      if (destroyed || scene.pausedByUI || scene.transitioning || scene.scene?.isPaused?.()) return false;
       if (cooldownLeft(now) > 0) {
         showHint(`PULSO RECARREGANDO · ${Math.ceil(cooldownLeft(now) / 1000)}s`);
-        return;
+        return false;
       }
       if (signalCap() > 86) {
         showHint('SINAL SATURADO · ESPERE BAIXAR');
-        return;
+        return false;
       }
 
       lastPulse = now;
@@ -132,7 +127,7 @@
           revealEntity(hazard, 0xff594d);
           dangerCount += 1;
           const speed = Number(hazard.getData?.('speed')) || 0;
-          if (speed > 0) hazard.setData('speed', speed + 6);
+          if (speed > 0) hazard.setData('speed', Math.min(220, speed + 6));
         }
       }
 
@@ -140,30 +135,13 @@
 
       const targetText = nearest ? `${Math.max(1, Math.round(nearestDistance / 32))}m` : 'SEM ECO';
       showHint(`ECO ${targetText} · AMEAÇAS ${dangerCount}`);
-
-      try {
-        const ctx = window.__VERITY_AUDIO_CTX__;
-        if (ctx?.state === 'running') {
-          const oscillator = ctx.createOscillator();
-          const gain = ctx.createGain();
-          oscillator.type = 'sine';
-          oscillator.frequency.setValueAtTime(170, ctx.currentTime);
-          oscillator.frequency.exponentialRampToValueAtTime(720, ctx.currentTime + .24);
-          gain.gain.setValueAtTime(.0001, ctx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(.045, ctx.currentTime + .025);
-          gain.gain.exponentialRampToValueAtTime(.0001, ctx.currentTime + .31);
-          oscillator.connect(gain).connect(ctx.destination);
-          oscillator.start();
-          oscillator.stop(ctx.currentTime + .33);
-        }
-      } catch (_) {
-        // Audio feedback is optional; the visual pulse remains fully functional.
-      }
+      return true;
     };
 
+    let pulseButton = null;
     const touchControls = document.querySelector('#touchControls');
     if (touchControls) {
-      const pulseButton = document.createElement('button');
+      pulseButton = document.createElement('button');
       pulseButton.type = 'button';
       pulseButton.dataset.touch = 'pulse';
       pulseButton.textContent = 'PULSO';
@@ -188,12 +166,23 @@
       }
     };
 
-    const keyListener = scene.input.keyboard.on('keydown-Q', event => {
+    const onPulseKey = event => {
       if (event?.repeat) return;
       emitPulse();
-    });
+    };
+    scene.input.keyboard.on('keydown-Q', onPulseKey);
     const statusTimer = window.setInterval(updateStatus, 150);
     updateStatus();
+
+    window.__VERITY_PULSE__ = {
+      emit: emitPulse,
+      getState: () => ({
+        ready: cooldownLeft(performance.now()) <= 0 && signalCap() <= 86,
+        cooldownMs: cooldownLeft(performance.now()),
+        signal: signalCap(),
+        revealing: revealUntil > performance.now(),
+      }),
+    };
 
     const cleanup = () => {
       if (destroyed) return;
@@ -204,9 +193,10 @@
       status.remove();
       hint.remove();
       style.remove();
+      if (pulseButton) pulseButton.remove();
       if (pulseRing?.active) pulseRing.destroy();
-      if (pulseKey) scene.input.keyboard.removeKey(pulseKey);
-      scene.input.keyboard.off('keydown-Q', keyListener);
+      scene.input.keyboard.off('keydown-Q', onPulseKey);
+      if (window.__VERITY_PULSE__?.emit === emitPulse) delete window.__VERITY_PULSE__;
     };
 
     scene.events.once('shutdown', cleanup);
