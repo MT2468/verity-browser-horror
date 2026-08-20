@@ -2,12 +2,56 @@
   const Phaser = window.Phaser;
   if (!Phaser?.Game || window.__VERITY_BOOTSTRAPPED__) return;
   window.__VERITY_BOOTSTRAPPED__ = true;
-  window.__VERITY_BUILD__ = '0.3.0';
+  window.__VERITY_BUILD__ = '0.3.1';
+  window.__VERITY_REQUESTED_DAY__ = 1;
+
+  const readSavedDay = () => {
+    try {
+      const raw = localStorage.getItem('verity-browser-horror-save-v2');
+      const parsed = raw ? JSON.parse(raw) : null;
+      const day = Number(parsed?.day);
+      return Number.isFinite(day) ? Phaser.Math.Clamp(day, 1, 6) : 1;
+    } catch {
+      return 1;
+    }
+  };
+
+  // Capture the player's intent before game.js handles the click. This lets the
+  // first scene receive the correct day immediately and removes the need for a
+  // late postBoot restart, which could race long-running QA/cinematic timers.
+  document.querySelector('#startBtn')?.addEventListener('click', () => {
+    window.__VERITY_REQUESTED_DAY__ = 1;
+  }, { capture: true });
+  document.querySelector('#continueBtn')?.addEventListener('click', () => {
+    window.__VERITY_REQUESTED_DAY__ = readSavedDay();
+  }, { capture: true });
 
   const OriginalGame = Phaser.Game;
   Phaser.Game = class VerityCapturedGame extends OriginalGame {
     constructor(config) {
-      super(config);
+      const safeConfig = { ...config };
+
+      // game.js originally used callbacks.postBoot to restart the first scene so
+      // a saved day could be injected. Phaser may invoke that callback after the
+      // scene is already active, producing a stale restart during QA. Instead we
+      // inject the requested day directly through the scene's init() lifecycle.
+      if (typeof safeConfig.scene === 'function') {
+        const OriginalScene = safeConfig.scene;
+        safeConfig.scene = class VerityInitialisedScene extends OriginalScene {
+          init(data = {}) {
+            const requested = Number(data?.day ?? window.__VERITY_REQUESTED_DAY__ ?? 1);
+            super.init({ ...data, day: Phaser.Math.Clamp(requested, 1, 6) });
+          }
+        };
+      }
+
+      if (safeConfig.callbacks) {
+        const callbacks = { ...safeConfig.callbacks };
+        delete callbacks.postBoot;
+        safeConfig.callbacks = callbacks;
+      }
+
+      super(safeConfig);
       window.__VERITY_GAME__ = this;
     }
   };
