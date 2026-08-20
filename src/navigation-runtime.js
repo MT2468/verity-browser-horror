@@ -25,7 +25,7 @@
     };
 
     const render = () => {
-      if (!scene.active || !scene.player?.active || scene.day === 4) {
+      if (!scene.scene?.isActive?.() || !scene.player?.active || scene.day === 4) {
         compass.textContent = 'ECO --';
         return;
       }
