@@ -147,14 +147,16 @@
   button.addEventListener('click', openArchive);
   closeButton.addEventListener('click', closeArchive);
   modal.addEventListener('pointerdown', event => { if (event.target === modal) closeArchive(); });
-  document.addEventListener('keydown', event => {
+  window.addEventListener('keydown', event => {
     if (event.key.toLowerCase() === 'j' && !event.ctrlKey && !event.metaKey && !event.altKey) {
       const tag = document.activeElement?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
       event.preventDefault();
+      event.stopImmediatePropagation();
       open ? closeArchive() : openArchive();
     } else if (event.key === 'Escape' && open) {
       event.preventDefault();
+      event.stopImmediatePropagation();
       closeArchive();
     } else if (event.key === 'Tab' && open) {
       const focusables = [...modal.querySelectorAll('button,[href],[tabindex]:not([tabindex="-1"])')].filter(el => !el.disabled);
