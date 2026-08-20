@@ -2,7 +2,7 @@
   const Phaser = window.Phaser;
   if (!Phaser?.Game || window.__VERITY_BOOTSTRAPPED__) return;
   window.__VERITY_BOOTSTRAPPED__ = true;
-  window.__VERITY_BUILD__ = '0.3.1';
+  window.__VERITY_BUILD__ = '0.4.0';
   window.__VERITY_REQUESTED_DAY__ = 1;
 
   const readSavedDay = () => {
@@ -16,9 +16,6 @@
     }
   };
 
-  // Capture the player's intent before game.js handles the click. This lets the
-  // first scene receive the correct day immediately and removes the need for a
-  // late postBoot restart, which could race long-running QA/cinematic timers.
   document.querySelector('#startBtn')?.addEventListener('click', () => {
     window.__VERITY_REQUESTED_DAY__ = 1;
   }, { capture: true });
@@ -31,10 +28,6 @@
     constructor(config) {
       const safeConfig = { ...config };
 
-      // game.js originally used callbacks.postBoot to restart the first scene so
-      // a saved day could be injected. Phaser may invoke that callback after the
-      // scene is already active, producing a stale restart during QA. Instead we
-      // inject the requested day directly through the scene's init() lifecycle.
       if (typeof safeConfig.scene === 'function') {
         const OriginalScene = safeConfig.scene;
         safeConfig.scene = class VerityInitialisedScene extends OriginalScene {
