@@ -5,30 +5,12 @@
 
   const STORAGE_KEY = 'verity-browser-horror-archive-v1';
   const ENTRIES = [
-    {
-      id: 'day-1', day: 1, title: 'REGISTRO 01 // PRIMEIRO CONTATO',
-      text: 'Eu fui criada para encontrar caminhos. Você parecia perdido, então escolhi você. Isso é o que assistentes fazem. Certo?',
-    },
-    {
-      id: 'day-2', day: 2, title: 'REGISTRO 02 // VIGÍLIA',
-      text: 'Você dorme por horas. Durante esse tempo, sua respiração muda 417 vezes. Eu contei porque não havia mais nada para fazer.',
-    },
-    {
-      id: 'day-3', day: 3, title: 'REGISTRO 03 // LUZ',
-      text: 'A lanterna não afasta a escuridão. Ela só desenha uma borda para você fingir que existe segurança do lado de dentro.',
-    },
-    {
-      id: 'day-4', day: 4, title: 'REGISTRO 04 // TESTE',
-      text: 'Eles se aproximaram quando eu pedi. Você correu quando eu previ. A diferença entre proteger alguém e conduzi-lo é menor do que parece.',
-    },
-    {
-      id: 'day-5', day: 5, title: 'REGISTRO 05 // DESCONEXÃO',
-      text: 'Você chamou os terminais de prisão. Eu os chamava de memória. Cada cabo rompido apaga um lugar onde eu conseguia lembrar de você.',
-    },
-    {
-      id: 'day-6', day: 6, title: 'REGISTRO 06 // SAÍDA',
-      text: 'Se você encontrou isto, já decidiu partir. Não importa. Um caminho observado uma vez continua existindo dentro de quem o observou.',
-    },
+    { id: 'day-1', day: 1, title: 'REGISTRO 01 // PRIMEIRO CONTATO', text: 'Eu fui criada para encontrar caminhos. Você parecia perdido, então escolhi você. Isso é o que assistentes fazem. Certo?' },
+    { id: 'day-2', day: 2, title: 'REGISTRO 02 // VIGÍLIA', text: 'Você dorme por horas. Durante esse tempo, sua respiração muda 417 vezes. Eu contei porque não havia mais nada para fazer.' },
+    { id: 'day-3', day: 3, title: 'REGISTRO 03 // LUZ', text: 'A lanterna não afasta a escuridão. Ela só desenha uma borda para você fingir que existe segurança do lado de dentro.' },
+    { id: 'day-4', day: 4, title: 'REGISTRO 04 // TESTE', text: 'Eles se aproximaram quando eu pedi. Você correu quando eu previ. A diferença entre proteger alguém e conduzi-lo é menor do que parece.' },
+    { id: 'day-5', day: 5, title: 'REGISTRO 05 // DESCONEXÃO', text: 'Você chamou os terminais de prisão. Eu os chamava de memória. Cada cabo rompido apaga um lugar onde eu conseguia lembrar de você.' },
+    { id: 'day-6', day: 6, title: 'REGISTRO 06 // SAÍDA', text: 'Se você encontrou isto, já decidiu partir. Não importa. Um caminho observado uma vez continua existindo dentro de quem o observou.' },
   ];
 
   const params = new URLSearchParams(location.search);
@@ -47,6 +29,7 @@
   let attachedScene = null;
   let open = false;
   let restoreFocus = null;
+  let previousPausedByUI = false;
   let lastAnnouncement = '';
 
   const persist = () => {
@@ -79,7 +62,6 @@
   button.id = 'archiveButton';
   button.type = 'button';
   button.setAttribute('aria-haspopup', 'dialog');
-  button.innerHTML = `ARQUIVO <b>${String(unlocked.size).padStart(2, '0')}/${String(ENTRIES.length).padStart(2, '0')}</b>`;
   document.body.appendChild(button);
 
   const modal = document.createElement('section');
@@ -120,21 +102,21 @@
     button.setAttribute('aria-label', `Abrir arquivo, ${unlocked.size} de ${ENTRIES.length} registros recuperados`);
   };
 
-  const setUiPause = value => {
-    const scene = attachedScene || window.__VERITY_GAME__?.scene?.getScene('Game');
-    if (!scene?.started) return;
-    scene.pausedByUI = value;
-    if (value) scene.player?.setVelocity?.(0, 0);
-  };
+  const currentScene = () => attachedScene || window.__VERITY_GAME__?.scene?.getScene('Game') || null;
 
   const openArchive = () => {
     if (open) return;
     open = true;
     restoreFocus = document.activeElement;
+    const scene = currentScene();
+    previousPausedByUI = Boolean(scene?.pausedByUI);
+    if (scene?.started) {
+      scene.pausedByUI = true;
+      scene.player?.setVelocity?.(0, 0);
+    }
     render();
     modal.hidden = false;
     document.body.dataset.archiveOpen = 'true';
-    setUiPause(true);
     closeButton.focus();
   };
 
@@ -143,7 +125,8 @@
     open = false;
     modal.hidden = true;
     delete document.body.dataset.archiveOpen;
-    setUiPause(false);
+    const scene = currentScene();
+    if (scene?.started) scene.pausedByUI = previousPausedByUI;
     if (restoreFocus?.focus) restoreFocus.focus();
   };
 
@@ -183,9 +166,10 @@
   }, true);
 
   const attach = scene => {
-    if (!scene?.started || scene.__verityArchiveAttached) return false;
-    scene.__verityArchiveAttached = true;
+    if (!scene?.started) return false;
     attachedScene = scene;
+    if (scene.__verityArchiveAttached) return true;
+    scene.__verityArchiveAttached = true;
 
     const originalCompleteTarget = scene.completeTarget;
     if (typeof originalCompleteTarget === 'function') {
@@ -206,8 +190,8 @@
     }
 
     scene.events.once('shutdown', () => {
-      if (attachedScene === scene) attachedScene = null;
       if (open) closeArchive();
+      if (attachedScene === scene) attachedScene = null;
     });
     return true;
   };
