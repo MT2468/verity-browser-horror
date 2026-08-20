@@ -2,6 +2,20 @@
   const params = new URLSearchParams(location.search);
   if (!params.has('qa')) return;
 
+  // This script is a classic script placed after the module tag. Classic scripts run
+  // while module scripts are deferred, so capture the Phaser.Game instance before
+  // game.js constructs it. Production runs never enter this branch.
+  const OriginalGame = window.Phaser?.Game;
+  if (OriginalGame && !window.__VERITY_QA_CAPTURED__) {
+    window.__VERITY_QA_CAPTURED__ = true;
+    window.Phaser.Game = class VerityQaGame extends OriginalGame {
+      constructor(config) {
+        super(config);
+        window.__VERITY_GAME__ = this;
+      }
+    };
+  }
+
   const state = { logs: [], running: false, scene: null, failures: 0 };
   const panel = document.createElement('aside');
   panel.id = 'verityQaPanel';
@@ -33,19 +47,19 @@
   const log = (text, kind = '') => {
     const stamp = new Date().toLocaleTimeString();
     state.logs.push(`[${stamp}] ${text}`);
-    if (state.logs.length > 16) state.logs.shift();
+    if (state.logs.length > 20) state.logs.shift();
     logEl.textContent = state.logs.join('\n');
-    if (kind === 'fail') state.failures++;
-    stateEl.textContent = state.failures ? `FAIL ${state.failures}` : 'READY';
-    stateEl.className = kind;
+    if (kind === 'fail') state.failures += 1;
+    if (!state.running) stateEl.textContent = state.failures ? `FAIL ${state.failures}` : 'READY';
+    if (kind) stateEl.className = kind;
     console[kind === 'fail' ? 'error' : 'log'](`[VERITY QA] ${text}`);
   };
 
-  window.addEventListener('error', (event) => log(`JS ERROR: ${event.message}`, 'fail'));
-  window.addEventListener('unhandledrejection', (event) => log(`PROMISE ERROR: ${event.reason}`, 'fail'));
+  window.addEventListener('error', event => log(`JS ERROR: ${event.message}`, 'fail'));
+  window.addEventListener('unhandledrejection', event => log(`PROMISE ERROR: ${event.reason}`, 'fail'));
 
   const getScene = () => {
-    const game = window.Phaser?.GAMES?.find(Boolean);
+    const game = window.__VERITY_GAME__;
     return game?.scene?.getScene('Game') || null;
   };
 
@@ -57,13 +71,13 @@
         state.scene = scene;
         return scene;
       }
-      await new Promise(r => setTimeout(r, 100));
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
     throw new Error('Game scene did not become ready');
   };
 
   const completeOne = scene => {
-    const target = scene.objectives?.getChildren()?.find(o => o.active && !o.getData('done'));
+    const target = scene.objectives?.getChildren()?.find(object => object.active && !object.getData('done'));
     if (!target) return false;
     scene.completeTarget(target);
     return true;
@@ -77,7 +91,8 @@
   const testDay = async (scene, day) => {
     scene.transitioning = false;
     scene.setupDay(day);
-    await new Promise(r => setTimeout(r, 120));
+    await new Promise(resolve => setTimeout(resolve, 120));
+
     assert(scene.day === day, `day ${day} initialized`);
     assert(scene.player.active && scene.verity.active, `day ${day} actors active`);
     assert(Number.isFinite(scene.player.x) && Number.isFinite(scene.verity.x), `day ${day} coordinates finite`);
@@ -86,23 +101,26 @@
       assert(scene.hazards.countActive() >= 5, 'survival enemies spawned');
       scene.surviveElapsed = 34.95;
       scene.updateSurvival(.1);
-      await new Promise(r => setTimeout(r, 80));
-      scene.transitioning = false;
+      assert(scene.__qaDayComplete === true, 'survival completion fires');
+      scene.__qaDayComplete = false;
       return;
     }
 
     const expected = { 1: 3, 2: 4, 3: 3, 5: 3, 6: 4 }[day];
     assert(scene.objectives.getChildren().length === expected, `day ${day} objective count ${expected}`);
 
-    for (let i = 0; i < expected; i++) {
+    for (let i = 0; i < expected; i += 1) {
       const before = scene.progress;
       if (!completeOne(scene)) throw new Error(`day ${day}: target ${i + 1} missing`);
       assert(scene.progress === before + 1, `day ${day} target ${i + 1} increments progress`);
-      await new Promise(r => setTimeout(r, 70));
+      await new Promise(resolve => setTimeout(resolve, 55));
       scene.transitioning = false;
     }
 
-    if (day === 6) {
+    if (day < 6) {
+      assert(scene.__qaDayComplete === true, `day ${day} completion fires`);
+      scene.__qaDayComplete = false;
+    } else {
       assert(scene.finalExitReady === true, 'final exit unlocked');
       assert(Boolean(scene.exitDoor?.active), 'final exit exists');
     }
@@ -113,13 +131,29 @@
     state.running = true;
     state.failures = 0;
     stateEl.textContent = 'RUNNING';
+    stateEl.className = '';
+
+    let scene;
+    let originalCompleteDay;
     try {
-      const scene = await waitForScene();
+      scene = await waitForScene();
       log('scene ready');
-      for (let day = 1; day <= 6; day++) {
+
+      // Avoid waiting on cinematic timers during the state-machine test. We still
+      // verify that each path requests a day completion.
+      originalCompleteDay = scene.completeDay;
+      scene.completeDay = function qaCompleteDay() {
+        this.__qaDayComplete = true;
+        this.transitioning = true;
+      };
+
+      for (let day = 1; day <= 6; day += 1) {
         await testDay(scene, day);
       }
+
       assert(scene.hazards.countActive() >= 8, 'final chase population present');
+      assert(scene.signal >= 0 && scene.signal <= 100, 'signal remains clamped');
+      assert(scene.stamina >= 0 && scene.stamina <= 100, 'stamina remains clamped');
       stateEl.textContent = 'ALL PASS';
       stateEl.className = 'pass';
       log('FULL STATE TEST COMPLETE', 'pass');
@@ -128,6 +162,7 @@
       stateEl.className = 'fail';
       log(error?.stack || String(error), 'fail');
     } finally {
+      if (scene && originalCompleteDay) scene.completeDay = originalCompleteDay;
       state.running = false;
     }
   };
@@ -139,8 +174,12 @@
       const scene = await waitForScene();
       const action = button.dataset.qa;
       if (action === 'objective') {
-        if (scene.day === 4) scene.surviveElapsed = 34.95;
-        else completeOne(scene);
+        if (scene.day === 4) {
+          scene.surviveElapsed = 34.95;
+          scene.updateSurvival(.1);
+        } else {
+          completeOne(scene);
+        }
       } else if (action === 'day') {
         scene.transitioning = false;
         scene.setupDay(Math.min(6, scene.day + 1));
