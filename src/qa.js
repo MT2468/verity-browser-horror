@@ -2,9 +2,6 @@
   const params = new URLSearchParams(location.search);
   if (!params.has('qa')) return;
 
-  // This script is a classic script placed after the module tag. Classic scripts run
-  // while module scripts are deferred, so capture the Phaser.Game instance before
-  // game.js constructs it. Production runs never enter this branch.
   const OriginalGame = window.Phaser?.Game;
   if (OriginalGame && !window.__VERITY_QA_CAPTURED__) {
     window.__VERITY_QA_CAPTURED__ = true;
@@ -47,7 +44,7 @@
   const log = (text, kind = '') => {
     const stamp = new Date().toLocaleTimeString();
     state.logs.push(`[${stamp}] ${text}`);
-    if (state.logs.length > 20) state.logs.shift();
+    if (state.logs.length > 24) state.logs.shift();
     logEl.textContent = state.logs.join('\n');
     if (kind === 'fail') state.failures += 1;
     if (!state.running) stateEl.textContent = state.failures ? `FAIL ${state.failures}` : 'READY';
@@ -58,10 +55,7 @@
   window.addEventListener('error', event => log(`JS ERROR: ${event.message}`, 'fail'));
   window.addEventListener('unhandledrejection', event => log(`PROMISE ERROR: ${event.reason}`, 'fail'));
 
-  const getScene = () => {
-    const game = window.__VERITY_GAME__;
-    return game?.scene?.getScene('Game') || null;
-  };
+  const getScene = () => window.__VERITY_GAME__?.scene?.getScene('Game') || null;
 
   const waitForScene = async (timeout = 12000) => {
     const start = performance.now();
@@ -83,6 +77,15 @@
       await new Promise(resolve => setTimeout(resolve, 50));
     }
     throw new Error('Signal pulse runtime did not attach');
+  };
+
+  const waitForDirector = async (timeout = 3000) => {
+    const start = performance.now();
+    while (performance.now() - start < timeout) {
+      if (window.__VERITY_DIRECTOR__?.forceBeat && window.__VERITY_DIRECTOR__?.getState) return window.__VERITY_DIRECTOR__;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    throw new Error('Psychological director runtime did not attach');
   };
 
   const completeOne = scene => {
@@ -150,6 +153,29 @@
     assert(pulse.emit() === false, 'signal pulse cannot be spammed during cooldown');
   };
 
+  const testDirector = async scene => {
+    const director = await waitForDirector();
+    scene.pausedByUI = false;
+    scene.transitioning = false;
+    scene.setupDay(3);
+    await new Promise(resolve => setTimeout(resolve, 80));
+
+    const before = director.getState();
+    assert(before.qaMode === true, 'director disables random beats in QA mode');
+    assert(director.available().includes('echo'), 'director exposes day-appropriate echo beat');
+    assert(director.available().includes('apparition'), 'director exposes day-appropriate apparition beat');
+
+    const echoFired = director.forceBeat('echo');
+    assert(echoFired === true, 'director can deterministically trigger false echo');
+    const afterEcho = director.getState();
+    assert(afterEcho.serial === before.serial + 1, 'director increments beat serial');
+    assert(afterEcho.echoActive === true, 'false echo enters active visual state');
+
+    const apparitionFired = director.forceBeat('apparition');
+    assert(apparitionFired === true, 'director can trigger peripheral apparition');
+    assert(director.getState().apparitionActive === true, 'apparition enters active visual state');
+  };
+
   const runFull = async () => {
     if (state.running) return;
     state.running = true;
@@ -163,19 +189,17 @@
       scene = await waitForScene();
       log('scene ready');
 
-      // Avoid waiting on cinematic timers during the state-machine test. We still
-      // verify that each path requests a day completion.
       originalCompleteDay = scene.completeDay;
       scene.completeDay = function qaCompleteDay() {
         this.__qaDayComplete = true;
         this.transitioning = true;
       };
 
-      for (let day = 1; day <= 6; day += 1) {
-        await testDay(scene, day);
-      }
-
+      for (let day = 1; day <= 6; day += 1) await testDay(scene, day);
       await testPulse(scene);
+      await testDirector(scene);
+      scene.setupDay(6);
+      await new Promise(resolve => setTimeout(resolve, 80));
       assert(scene.hazards.countActive() >= 8, 'final chase population present');
       assert(scene.signal >= 0 && scene.signal <= 100, 'signal remains clamped');
       assert(scene.stamina >= 0 && scene.stamina <= 100, 'stamina remains clamped');
