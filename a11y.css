@@ -1,0 +1,31 @@
+/* Accessibility and input polish layered over the visual stylesheet. */
+
+button:focus-visible {
+  outline: 2px solid #f3ea36;
+  outline-offset: 3px;
+}
+
+#signalCompass {
+  min-width: 58px;
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+
+  .scanlines { opacity: .035; }
+  .glitch-flash.hit { animation: none !important; opacity: .08; }
+}
+
+@media (max-width: 720px) {
+  .top-left { max-width: calc(100vw - 150px); }
+  .objective-card { min-width: 0; }
+  .objective-card strong { overflow-wrap: anywhere; }
+  #signalCompass { left: 12px !important; top: 102px !important; }
+  #touchControls { bottom: max(12px, env(safe-area-inset-bottom)) !important; }
+  .flashlight { bottom: max(72px, calc(58px + env(safe-area-inset-bottom))); }
+}
